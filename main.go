@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/codyonesock/weather/weather"
+	"github.com/codyonesock/rest_weather/weather"
 )
 
 func main() {

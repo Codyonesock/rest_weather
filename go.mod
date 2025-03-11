@@ -1,4 +1,4 @@
-module github.com/codyonesock/weather
+module github.com/codyonesock/rest_weather
 
 go 1.22.4
 
