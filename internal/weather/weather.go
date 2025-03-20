@@ -4,25 +4,29 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/storage"
+	"github.com/codyonesock/rest_weather/internal/util"
 )
 
 const openMeteoBaseUrl = "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f"
 
 // GetCurrentWeatherByCity returns the current weather (temperature and weather speed) using the lat/lon of the city entered
 func GetCurrentWeatherByCity(w http.ResponseWriter, r *http.Request) {
-	var weatherData CurrentWeatherResponse
-	getWeatherData(w, r, openMeteoBaseUrl+"&current_weather=true", &weatherData)
+	var weatherData models.CurrentWeatherResponse
+	util.GetWeatherData(w, r, openMeteoBaseUrl+"&current_weather=true", &weatherData)
 }
 
 // GetForecastByCity returns a 7 day forecast (dates, min/max temps) using the lat/lon of the city entered
 func GetForecastByCity(w http.ResponseWriter, r *http.Request) {
-	var forecastData ForecastResponse
-	getWeatherData(w, r, openMeteoBaseUrl+"&daily=temperature_2m_max,temperature_2m_min", &forecastData)
+	var forecastData models.ForecastResponse
+	util.GetWeatherData(w, r, openMeteoBaseUrl+"&daily=temperature_2m_max,temperature_2m_min", &forecastData)
 }
 
 // GetUserData returns user data that's read from a local json file
 func GetUserData(w http.ResponseWriter, r *http.Request) {
-	userData, err := loadUserData()
+	userData, err := storage.LoadUserData()
 	if err != nil {
 		http.Error(w, "error loading user data", http.StatusInternalServerError)
 		return
@@ -42,9 +46,9 @@ func AddOrDeleteUserCity(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "POST":
-		addCity(w, city)
+		util.AddCity(w, city)
 	case "DELETE":
-		deleteCity(w, city)
+		util.DeleteCity(w, city)
 	default:
 		http.Error(w, "get or post only", http.StatusMethodNotAllowed)
 	}
@@ -71,14 +75,14 @@ func UpdateUserUnits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	UserData, err := loadUserData()
+	UserData, err := storage.LoadUserData()
 	if err != nil {
 		http.Error(w, "error loading user data", http.StatusInternalServerError)
 		return
 	}
 
 	UserData.Units = reqBody.Units
-	if err := saveUserData(UserData); err != nil {
+	if err := storage.SaveUserData(UserData); err != nil {
 		http.Error(w, "error saving user data", http.StatusInternalServerError)
 		return
 	}

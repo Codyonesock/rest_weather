@@ -1,4 +1,4 @@
-package weather
+package util
 
 import (
 	"testing"

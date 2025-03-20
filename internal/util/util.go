@@ -1,4 +1,4 @@
-package weather
+package util
 
 import (
 	"encoding/json"
@@ -9,6 +9,9 @@ import (
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+
+	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/storage"
 )
 
 // GetGeocode returns the geocode for a city. It's primarily used by open-meteo endpoints which only accept lat/lon
@@ -20,7 +23,7 @@ func getGeocode(city string) (float64, float64, error) {
 	}
 	defer resp.Body.Close()
 
-	var geoData GeocodeResponse
+	var geoData models.GeocodeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&geoData); err != nil || len(geoData.Results) == 0 {
 		return 0, 0, fmt.Errorf("no results for city: %s", city)
 	}
@@ -29,7 +32,7 @@ func getGeocode(city string) (float64, float64, error) {
 }
 
 // GetWeatherData returns weather data based on the passed in url and struct
-func getWeatherData(w http.ResponseWriter, r *http.Request, url string, respStruct interface{}) {
+func GetWeatherData(w http.ResponseWriter, r *http.Request, url string, respStruct interface{}) {
 	city := r.URL.Query().Get("city")
 	if city == "" {
 		http.Error(w, "city is required", http.StatusBadRequest)
@@ -60,8 +63,8 @@ func getWeatherData(w http.ResponseWriter, r *http.Request, url string, respStru
 }
 
 // AddCity works in conjunction with weather/AddOrDeleteUserCity. It adds a city to the tracked list
-func addCity(w http.ResponseWriter, city string) {
-	userData, err := loadUserData()
+func AddCity(w http.ResponseWriter, city string) {
+	userData, err := storage.LoadUserData()
 	if err != nil {
 		http.Error(w, "error loading user data", http.StatusInternalServerError)
 		return
@@ -78,7 +81,7 @@ func addCity(w http.ResponseWriter, city string) {
 	titleCity := caser.String(city)
 	userData.Cities = append(userData.Cities, titleCity)
 
-	if err := saveUserData(userData); err != nil {
+	if err := storage.SaveUserData(userData); err != nil {
 		http.Error(w, "error saving city", http.StatusInternalServerError)
 		return
 	}
@@ -88,8 +91,8 @@ func addCity(w http.ResponseWriter, city string) {
 }
 
 // DeleteCity works in conjunction with weather/AddOrDeleteUserCity. It removes a city in the tracked list
-func deleteCity(w http.ResponseWriter, city string) {
-	userData, err := loadUserData()
+func DeleteCity(w http.ResponseWriter, city string) {
+	userData, err := storage.LoadUserData()
 	if err != nil {
 		http.Error(w, "error loading user data", http.StatusInternalServerError)
 		return
@@ -109,7 +112,7 @@ func deleteCity(w http.ResponseWriter, city string) {
 		return
 	}
 
-	if err := saveUserData(userData); err != nil {
+	if err := storage.SaveUserData(userData); err != nil {
 		http.Error(w, "error saving user data", http.StatusInternalServerError)
 		return
 	}

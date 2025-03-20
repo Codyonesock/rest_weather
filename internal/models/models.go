@@ -1,4 +1,4 @@
-package weather
+package models
 
 // GeoCodeResponse is a struct based on geocode data returned from open-meteo
 type GeocodeResponse struct {
