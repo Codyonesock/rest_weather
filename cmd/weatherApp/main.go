@@ -1,31 +1,83 @@
+// Package main initializes the logger and routing.
+// It also loads a config to configure the port and stream url.
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"time"
 
-	"github.com/codyonesock/rest_weather/internal/weather"
+	"github.com/go-chi/chi"
+	"go.uber.org/zap"
 )
 
+const (
+	readTimeout  = 10 * time.Second
+	writeTimeout = 10 * time.Second
+	idleTimeout  = 10 * time.Second
+)
+
+type config struct {
+	Port string `json:"port"`
+}
+
+func loadConfig(filename string, l *zap.Logger) (*config, error) {
+	data, err := os.ReadFile("config.json")
+	if err != nil {
+		l.Error("Error reading config file", zap.String("filename", filename), zap.Error(err))
+		return nil, fmt.Errorf("error reading config file: %w", err)
+	}
+
+	var config config
+	if err := json.Unmarshal(data, &config); err != nil {
+		l.Error("Error unmarshalling JSON", zap.Error(err))
+		return nil, fmt.Errorf("error unmarshalling JSON: %w", err)
+	}
+
+	l.Info("Config loaded", zap.String("port", config.Port))
+
+	return &config, nil
+}
+
 func main() {
-	//# curl -X GET http://localhost:8080/weather\?city\=halifax
-	http.HandleFunc("/weather", weather.GetCurrentWeatherByCity)
+	logger, err := zap.NewProduction()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+	}
 
-	//# curl -X GET http://localhost:8080/forecast\?city\=halifax
-	http.HandleFunc("/forecast", weather.GetForecastByCity)
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			logger.Fatal("Error loading config", zap.Error(err))
+		}
+	}()
 
-	//# curl -X GET http://localhost:8080/user/data
-	http.HandleFunc("/user/data", weather.GetUserData)
+	config, err := loadConfig("config.json", logger)
+	if err != nil {
+		logger.Fatal("Error loading config", zap.Error(err))
+		return
+	}
 
-	//# curl -X POST http://localhost:8080/user/cities/halifax
-	//# curl -X DELETE http://localhost:8080/user/cities/halifax
-	http.HandleFunc("/user/cities/", weather.AddOrDeleteUserCity)
+	r := chi.NewRouter()
 
-	//# curl -X PUT "http://localhost:8080/user/units" -H "Content-Type: application/json" -d '{"units": "metric"}'
-	//# curl -X PUT "http://localhost:8080/user/units" -H "Content-Type: application/json" -d '{"units": "imperial"}'
-	http.HandleFunc("/user/units", weather.UpdateUserUnits)
+	// TODO: Fix this mess :D
+	// http.HandleFunc("/weather", weather.GetCurrentWeatherByCity)
+	// http.HandleFunc("/forecast", weather.GetForecastByCity)
+	// http.HandleFunc("/user/data", weather.GetUserData)
+	// http.HandleFunc("/user/cities/", weather.AddOrDeleteUserCity)
+	// http.HandleFunc("/user/units", weather.UpdateUserUnits)
 
-	port := ":8080"
-	fmt.Printf("Server running on port %s\n", port)
-	http.ListenAndServe(port, nil)
+	logger.Info("Server running", zap.String("port", config.Port))
+	server := &http.Server{
+		Addr:         config.Port,
+		Handler:      r,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
+		logger.Fatal("Error starting server", zap.Error(err))
+	}
 }
