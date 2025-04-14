@@ -1,1 +1,6 @@
+main
+*.exe
+*.out
+.vscode/
+.DS_Store
 userdata.json
