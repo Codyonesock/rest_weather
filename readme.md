@@ -10,8 +10,8 @@ This project is a simple REST API for retrieving weather data and managing user 
 - `PUT/user/cities, -d '{"units": "metric"}, -d '{"units": "imperial"}`:
 
 ###### CMD
-- `curl -X GET http://localhost:8080/weather\?city\=halifax`
-- `curl -X GET http://localhost:8080/forecast\?city\=halifax`
+- `curl -X GET http://localhost:8080/weather/halifax`
+- `curl -X GET http://localhost:8080/forecast?city=halifax`
 - `curl -X GET http://localhost:8080/user/data`
 - `curl -X POST http://localhost:8080/user/cities/halifax`
 - `curl -X DELETE http://localhost:8080/user/cities/halifax`

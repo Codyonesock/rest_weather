@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/codyonesock/rest_weather/internal/weather"
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
 )
@@ -20,7 +21,9 @@ const (
 )
 
 type config struct {
-	Port string `json:"port"`
+	Port          string `json:"port"`
+	WeatherAPIURL string `json:"weather_api_url"`
+	GeocodeAPIURL string `json:"geocode_api_url"`
 }
 
 func loadConfig(filename string, l *zap.Logger) (*config, error) {
@@ -30,15 +33,19 @@ func loadConfig(filename string, l *zap.Logger) (*config, error) {
 		return nil, fmt.Errorf("error reading config file: %w", err)
 	}
 
-	var config config
-	if err := json.Unmarshal(data, &config); err != nil {
+	var cfg config
+	if err := json.Unmarshal(data, &cfg); err != nil {
 		l.Error("Error unmarshalling JSON", zap.Error(err))
 		return nil, fmt.Errorf("error unmarshalling JSON: %w", err)
 	}
 
-	l.Info("Config loaded", zap.String("port", config.Port))
+	l.Info("Config loaded",
+		zap.String("port", cfg.Port),
+		zap.String("weather_api_url", cfg.WeatherAPIURL),
+		zap.String("geocode_api_url", cfg.GeocodeAPIURL),
+	)
 
-	return &config, nil
+	return &cfg, nil
 }
 
 func main() {
@@ -62,11 +69,23 @@ func main() {
 	r := chi.NewRouter()
 
 	// TODO: Fix this mess :D
-	// http.HandleFunc("/weather", weather.GetCurrentWeatherByCity)
 	// http.HandleFunc("/forecast", weather.GetForecastByCity)
 	// http.HandleFunc("/user/data", weather.GetUserData)
 	// http.HandleFunc("/user/cities/", weather.AddOrDeleteUserCity)
 	// http.HandleFunc("/user/units", weather.UpdateUserUnits)
+
+	var weatherService weather.ServiceInterface = weather.NewWeatherService(
+		logger,
+		config.WeatherAPIURL,
+		config.GeocodeAPIURL,
+	)
+
+	r.Get("/weather/{city}", func(w http.ResponseWriter, r *http.Request) {
+		city := chi.URLParam(r, "city")
+		if _, err := weatherService.GetCurrentWeatherByCity(w, city); err != nil {
+			http.Error(w, "Error getting current weather", http.StatusInternalServerError)
+		}
+	})
 
 	logger.Info("Server running", zap.String("port", config.Port))
 	server := &http.Server{

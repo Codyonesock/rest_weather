@@ -1,3 +1,5 @@
 {
-  "port": ":8080"
+  "port": ":8080",
+  "weather_api_url": "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true",
+  "geocode_api_url": "https://geocoding-api.open-meteo.com/v1/search?name=%s&count=1&language=en&format=json"
 }
