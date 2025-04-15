@@ -21,9 +21,10 @@ const (
 )
 
 type config struct {
-	Port          string `json:"port"`
-	WeatherAPIURL string `json:"weather_api_url"`
-	GeocodeAPIURL string `json:"geocode_api_url"`
+	Port                  string `json:"port"`
+	CurrentWeatherAPIURL  string `json:"current_weather_api_url"`
+	ForecastWeatherAPIURL string `json:"forecast_weather_api_url"`
+	GeocodeAPIURL         string `json:"geocode_api_url"`
 }
 
 func loadConfig(filename string, l *zap.Logger) (*config, error) {
@@ -41,7 +42,8 @@ func loadConfig(filename string, l *zap.Logger) (*config, error) {
 
 	l.Info("Config loaded",
 		zap.String("port", cfg.Port),
-		zap.String("weather_api_url", cfg.WeatherAPIURL),
+		zap.String("current_weather_api_url", cfg.CurrentWeatherAPIURL),
+		zap.String("forecast_weather_api_url", cfg.ForecastWeatherAPIURL),
 		zap.String("geocode_api_url", cfg.GeocodeAPIURL),
 	)
 
@@ -69,14 +71,14 @@ func main() {
 	r := chi.NewRouter()
 
 	// TODO: Fix this mess :D
-	// http.HandleFunc("/forecast", weather.GetForecastByCity)
 	// http.HandleFunc("/user/data", weather.GetUserData)
 	// http.HandleFunc("/user/cities/", weather.AddOrDeleteUserCity)
 	// http.HandleFunc("/user/units", weather.UpdateUserUnits)
 
 	var weatherService weather.ServiceInterface = weather.NewWeatherService(
 		logger,
-		config.WeatherAPIURL,
+		config.CurrentWeatherAPIURL,
+		config.ForecastWeatherAPIURL,
 		config.GeocodeAPIURL,
 	)
 
@@ -84,6 +86,13 @@ func main() {
 		city := chi.URLParam(r, "city")
 		if _, err := weatherService.GetCurrentWeatherByCity(w, city); err != nil {
 			http.Error(w, "Error getting current weather", http.StatusInternalServerError)
+		}
+	})
+
+	r.Get("/forecast/{city}", func(w http.ResponseWriter, r *http.Request) {
+		city := chi.URLParam(r, "city")
+		if _, err := weatherService.GetForecastByCity(w, city); err != nil {
+			http.Error(w, "Error getting forecast data", http.StatusInternalServerError)
 		}
 	})
 

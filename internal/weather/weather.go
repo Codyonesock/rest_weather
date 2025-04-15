@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/codyonesock/rest_weather/internal/storage"
 	"go.uber.org/zap"
 )
 
@@ -42,21 +43,29 @@ type ForecastResponse struct {
 // ServiceInterface depicts the interface for the weather package.
 type ServiceInterface interface {
 	GetCurrentWeatherByCity(w http.ResponseWriter, city string) (*CurrentWeatherResponse, error)
+	GetForecastByCity(w http.ResponseWriter, city string) (*ForecastResponse, error)
 }
 
 // Service handles dependencies and config.
 type Service struct {
-	Logger        *zap.Logger
-	WeatherAPIURL string
-	GeocodeAPIURL string
+	Logger                *zap.Logger
+	CurrentWeatherAPIURL  string
+	ForecastWeatherAPIURL string
+	GeocodeAPIURL         string
 }
 
 // NewWeatherService create a new instance of Service.
-func NewWeatherService(l *zap.Logger, weatherAPIURL, geocodeAPIURL string) *Service {
+func NewWeatherService(
+	l *zap.Logger,
+	currentWeatherAPIURL,
+	forecastWeatherAPIURL,
+	geocodeAPIURL string,
+) *Service {
 	return &Service{
-		Logger:        l,
-		WeatherAPIURL: weatherAPIURL,
-		GeocodeAPIURL: geocodeAPIURL,
+		Logger:                l,
+		CurrentWeatherAPIURL:  currentWeatherAPIURL,
+		ForecastWeatherAPIURL: forecastWeatherAPIURL,
+		GeocodeAPIURL:         geocodeAPIURL,
 	}
 }
 
@@ -169,7 +178,7 @@ func (s *Service) GetCurrentWeatherByCity(
 	city string,
 ) (*CurrentWeatherResponse, error) {
 	var weatherData CurrentWeatherResponse
-	if err := s.getWeatherData(city, s.WeatherAPIURL, &weatherData); err != nil {
+	if err := s.getWeatherData(city, s.CurrentWeatherAPIURL, &weatherData); err != nil {
 		s.Logger.Error("Failed to get weather data", zap.Error(err))
 		return nil, fmt.Errorf("failed to get weather data for city %s: %w", city, err)
 	}
@@ -185,22 +194,37 @@ func (s *Service) GetCurrentWeatherByCity(
 }
 
 // GetForecastByCity returns a 7 day forecast (dates, min/max temps) using the lat/lon of the city entered
-// func GetForecastByCity(w http.ResponseWriter, r *http.Request) {
-// 	var forecastData models.ForecastResponse
-// 	util.GetWeatherData(w, r, openMeteoBaseURL+"&daily=temperature_2m_max,temperature_2m_min", &forecastData)
-// }
+func (s *Service) GetForecastByCity(
+	w http.ResponseWriter,
+	city string,
+) (*ForecastResponse, error) {
+	var forecastData ForecastResponse
+	if err := s.getWeatherData(city, s.ForecastWeatherAPIURL, &forecastData); err != nil {
+		s.Logger.Error("Failed to get forecast data", zap.Error(err))
+		return nil, fmt.Errorf("failed to get forecast data for city %s: %w", city, err)
+	}
 
-// // GetUserData returns user data that's read from a local json file.
-// func GetUserData(w http.ResponseWriter, r *http.Request) {
-// 	userData, err := storage.LoadUserData()
-// 	if err != nil {
-// 		http.Error(w, "error loading user data", http.StatusInternalServerError)
-// 		return
-// 	}
+	w.Header().Set("Content-Type", "application/json")
 
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(userData)
-// }
+	if err := json.NewEncoder(w).Encode(forecastData); err != nil {
+		s.Logger.Error("Error encoding forecastData", zap.Error(err))
+		return nil, fmt.Errorf("failed to encode forecastData: %w", err)
+	}
+
+	return &forecastData, nil
+}
+
+// GetUserData returns user data that's read from a local json file.
+func GetUserData(w http.ResponseWriter, r *http.Request) {
+	userData, err := storage.LoadUserData()
+	if err != nil {
+		http.Error(w, "error loading user data", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(userData)
+}
 
 // // AddOrDeleteUserCity handles POST and DELETE requests for /user/cities/.
 // func AddOrDeleteUserCity(w http.ResponseWriter, r *http.Request) {
