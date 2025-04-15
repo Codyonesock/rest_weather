@@ -1,46 +1,81 @@
 package storage_test
 
-// import (
-// 	"os"
-// 	"testing"
+import (
+	"os"
+	"testing"
 
-// 	"github.com/codyonesock/rest_weather/internal/models"
-// )
+	"go.uber.org/zap"
 
-// func TestLoadUserData(t *testing.T) {
-// 	os.Remove("userdata.json")
+	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/storage"
+)
 
-// 	_, err := LoadUserData()
-// 	if err != nil {
-// 		t.Fatalf("expected no error, got %v", err)
-// 	}
+func setupTestStorage(t *testing.T) (*storage.Service, func()) {
+	t.Helper()
 
-// 	os.Remove("userdata.json")
-// }
+	tempFile := t.TempDir() + "/test_userdata.json"
 
-// func TestSaveUserData(t *testing.T) {
-// 	userData := models.UserData{
-// 		Cities: []string{"Halifax"},
-// 		Units:  "metric",
-// 	}
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		t.Fatalf("failed to initialize logger: %v", err)
+	}
 
-// 	err := SaveUserData(userData)
-// 	if err != nil {
-// 		t.Fatalf("expected no error, got %v", err)
-// 	}
+	storageService := storage.NewStorageService(tempFile, logger)
 
-// 	loadedData, err := LoadUserData()
-// 	if err != nil {
-// 		t.Fatalf("expected no error, got %v", err)
-// 	}
+	cleanup := func() {
+		if err := os.Remove(tempFile); err != nil && !os.IsNotExist(err) {
+			t.Errorf("failed to remove temp file: %v", err)
+		}
+	}
 
-// 	if len(loadedData.Cities) != 1 || loadedData.Cities[0] != "Halifax" {
-// 		t.Errorf("expected cities to be ['Halifax'], got %v", loadedData.Cities)
-// 	}
+	return storageService, cleanup
+}
 
-// 	if loadedData.Units != "metric" {
-// 		t.Errorf("expected units to be 'metric', got %v", loadedData.Units)
-// 	}
+func TestLoadUserData(t *testing.T) {
+	t.Parallel()
 
-// 	os.Remove("userdata.json")
-// }
+	storageService, cleanup := setupTestStorage(t)
+	defer cleanup()
+
+	userData, err := storageService.LoadUserData()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(userData.Cities) != 0 {
+		t.Errorf("expected no cities, got %v", userData.Cities)
+	}
+
+	if userData.Units != "metric" {
+		t.Errorf("expected units to be 'metric', got %v", userData.Units)
+	}
+}
+
+func TestSaveUserData(t *testing.T) {
+	t.Parallel()
+
+	storageService, cleanup := setupTestStorage(t)
+	defer cleanup()
+
+	userData := models.UserData{
+		Cities: []string{"Halifax"},
+		Units:  "metric",
+	}
+
+	if err := storageService.SaveUserData(userData); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	loadedData, err := storageService.LoadUserData()
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(loadedData.Cities) != 1 || loadedData.Cities[0] != "Halifax" {
+		t.Errorf("expected cities to be ['Halifax'], got %v", loadedData.Cities)
+	}
+
+	if loadedData.Units != "metric" {
+		t.Errorf("expected units to be 'metric', got %v", loadedData.Units)
+	}
+}
