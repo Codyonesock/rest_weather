@@ -9,9 +9,11 @@ import (
 	"os"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/codyonesock/rest_weather/internal/storage"
 	"github.com/codyonesock/rest_weather/internal/weather"
 	"github.com/go-chi/chi"
-	"go.uber.org/zap"
 )
 
 const (
@@ -25,6 +27,7 @@ type config struct {
 	CurrentWeatherAPIURL  string `json:"current_weather_api_url"`
 	ForecastWeatherAPIURL string `json:"forecast_weather_api_url"`
 	GeocodeAPIURL         string `json:"geocode_api_url"`
+	DatabaseURL           string `json:"database_url"`
 }
 
 func loadConfig(filename string, l *zap.Logger) (*config, error) {
@@ -45,6 +48,7 @@ func loadConfig(filename string, l *zap.Logger) (*config, error) {
 		zap.String("current_weather_api_url", cfg.CurrentWeatherAPIURL),
 		zap.String("forecast_weather_api_url", cfg.ForecastWeatherAPIURL),
 		zap.String("geocode_api_url", cfg.GeocodeAPIURL),
+		zap.String("database_url", cfg.DatabaseURL),
 	)
 
 	return &cfg, nil
@@ -71,15 +75,21 @@ func main() {
 	r := chi.NewRouter()
 
 	// TODO: Fix this mess :D
-	// http.HandleFunc("/user/data", weather.GetUserData)
 	// http.HandleFunc("/user/cities/", weather.AddOrDeleteUserCity)
 	// http.HandleFunc("/user/units", weather.UpdateUserUnits)
 
-	var weatherService weather.ServiceInterface = weather.NewWeatherService(
-		logger,
-		config.CurrentWeatherAPIURL,
-		config.ForecastWeatherAPIURL,
-		config.GeocodeAPIURL,
+	var (
+		storageService storage.ServiceInterface = storage.NewStorageService(
+			config.DatabaseURL,
+			logger,
+		)
+		weatherService weather.ServiceInterface = weather.NewWeatherService(
+			logger,
+			storageService,
+			config.CurrentWeatherAPIURL,
+			config.ForecastWeatherAPIURL,
+			config.GeocodeAPIURL,
+		)
 	)
 
 	r.Get("/weather/{city}", func(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +103,12 @@ func main() {
 		city := chi.URLParam(r, "city")
 		if _, err := weatherService.GetForecastByCity(w, city); err != nil {
 			http.Error(w, "Error getting forecast data", http.StatusInternalServerError)
+		}
+	})
+
+	r.Get("/user/data", func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := weatherService.GetUserData(w); err != nil {
+			http.Error(w, "Error getting user data", http.StatusInternalServerError)
 		}
 	})
 

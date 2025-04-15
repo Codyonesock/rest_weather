@@ -11,8 +11,10 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/codyonesock/rest_weather/internal/storage"
 	"go.uber.org/zap"
+
+	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/storage"
 )
 
 // GeocodeResponse is a struct based on geocode data returned from open-meteo.
@@ -44,11 +46,13 @@ type ForecastResponse struct {
 type ServiceInterface interface {
 	GetCurrentWeatherByCity(w http.ResponseWriter, city string) (*CurrentWeatherResponse, error)
 	GetForecastByCity(w http.ResponseWriter, city string) (*ForecastResponse, error)
+	GetUserData(w http.ResponseWriter) (*models.UserData, error)
 }
 
 // Service handles dependencies and config.
 type Service struct {
 	Logger                *zap.Logger
+	Storage               storage.ServiceInterface
 	CurrentWeatherAPIURL  string
 	ForecastWeatherAPIURL string
 	GeocodeAPIURL         string
@@ -57,12 +61,14 @@ type Service struct {
 // NewWeatherService create a new instance of Service.
 func NewWeatherService(
 	l *zap.Logger,
+	si storage.ServiceInterface,
 	currentWeatherAPIURL,
 	forecastWeatherAPIURL,
 	geocodeAPIURL string,
 ) *Service {
 	return &Service{
 		Logger:                l,
+		Storage:               si,
 		CurrentWeatherAPIURL:  currentWeatherAPIURL,
 		ForecastWeatherAPIURL: forecastWeatherAPIURL,
 		GeocodeAPIURL:         geocodeAPIURL,
@@ -193,7 +199,7 @@ func (s *Service) GetCurrentWeatherByCity(
 	return &weatherData, nil
 }
 
-// GetForecastByCity returns a 7 day forecast (dates, min/max temps) using the lat/lon of the city entered
+// GetForecastByCity returns a 7 day forecast (dates, min/max temps) using the lat/lon of the city entered.
 func (s *Service) GetForecastByCity(
 	w http.ResponseWriter,
 	city string,
@@ -215,15 +221,21 @@ func (s *Service) GetForecastByCity(
 }
 
 // GetUserData returns user data that's read from a local json file.
-func GetUserData(w http.ResponseWriter, r *http.Request) {
-	userData, err := storage.LoadUserData()
+func (s *Service) GetUserData(w http.ResponseWriter) (*models.UserData, error) {
+	userData, err := s.Storage.LoadUserData()
 	if err != nil {
-		http.Error(w, "error loading user data", http.StatusInternalServerError)
-		return
+		s.Logger.Error("Error loading user data", zap.Error(err))
+		return nil, fmt.Errorf("failed to load user data: %w", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(userData)
+
+	if err := json.NewEncoder(w).Encode(userData); err != nil {
+		s.Logger.Error("Error encoding user data", zap.Error(err))
+		return nil, fmt.Errorf("failed to encode user data: %w", err)
+	}
+
+	return &userData, nil
 }
 
 // // AddOrDeleteUserCity handles POST and DELETE requests for /user/cities/.
