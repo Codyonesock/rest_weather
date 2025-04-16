@@ -75,7 +75,6 @@ func main() {
 	r := chi.NewRouter()
 
 	// TODO: Fix this mess :D
-	// http.HandleFunc("/user/cities/", weather.AddOrDeleteUserCity)
 	// http.HandleFunc("/user/units", weather.UpdateUserUnits)
 
 	var (
@@ -116,6 +115,13 @@ func main() {
 		city := chi.URLParam(r, "city")
 		if err := weatherService.AddCity(w, city); err != nil {
 			http.Error(w, "Error getting adding city to user data", http.StatusInternalServerError)
+		}
+	})
+
+	r.Delete("/user/cities/{city}", func(w http.ResponseWriter, r *http.Request) {
+		city := chi.URLParam(r, "city")
+		if err := weatherService.DeleteCity(w, city); err != nil {
+			http.Error(w, "Error deleting city from user data", http.StatusInternalServerError)
 		}
 	})
 
