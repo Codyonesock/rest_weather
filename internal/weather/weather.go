@@ -89,101 +89,7 @@ var (
 	errInvalidUnit      = errors.New("invalid unit type")
 )
 
-// doRequest validates a url, sets up a context, and performs an HTTP request.
-func (s *Service) doRequest(method, rawURL string, body io.Reader) (*http.Response, error) {
-	validatedURL, err := s.validateURL(rawURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate URL: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, method, validatedURL, body)
-	if err != nil {
-		s.Logger.Error("Failed to create HTTP request", zap.String("url", rawURL), zap.Error(err))
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		s.Logger.Error("Failed to perform HTTP request", zap.String("url", validatedURL), zap.Error(err))
-		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
-	}
-
-	return res, nil
-}
-
-// validateStreamURL will validate a url.
-func (s *Service) validateURL(rawURL string) (string, error) {
-	parsedURL, err := url.Parse(rawURL)
-	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
-		return "", fmt.Errorf("%w: %s", errInvalidURL, rawURL)
-	}
-
-	return parsedURL.String(), nil
-}
-
-// GetGeocode returns the geocode for a city. It's primarily used by open-meteo endpoints which only accept lat/lon.
-func (s *Service) getGeocode(city string) (float64, float64, error) {
-	geoURL := fmt.Sprintf(s.GeocodeAPIURL, url.QueryEscape(city))
-
-	res, err := s.doRequest(http.MethodGet, geoURL, nil)
-	if err != nil {
-		s.Logger.Error("Failed to fetch geocode", zap.String("city", city), zap.Error(err))
-		return 0, 0, fmt.Errorf("failed to get geocode: %w", err)
-	}
-
-	defer func() {
-		if err := res.Body.Close(); err != nil {
-			s.Logger.Error("Error closing response body", zap.Error(err))
-		}
-	}()
-
-	var geoData GeocodeResponse
-	if err := json.NewDecoder(res.Body).Decode(&geoData); err != nil || len(geoData.Results) == 0 {
-		s.Logger.Error("No geocode results", zap.String("city", city), zap.Error(err))
-		return 0, 0, fmt.Errorf("%w: %s", errNoResultsForCity, city)
-	}
-
-	return geoData.Results[0].Latitude, geoData.Results[0].Longitude, nil
-}
-
-// GetWeatherData returns weather data based on the passed in url and struct.
-func (s *Service) getWeatherData(city string, url string, respStruct interface{}) error {
-	if city == "" {
-		return errCityRequired
-	}
-
-	lat, lon, err := s.getGeocode(city)
-	if err != nil {
-		return fmt.Errorf("failed to get geocode: %w", err)
-	}
-
-	weatherURL := fmt.Sprintf(url, lat, lon)
-
-	res, err := s.doRequest(http.MethodGet, weatherURL, nil)
-	if err != nil {
-		s.Logger.Error("Failed to get weather data", zap.String("url", weatherURL), zap.Error(err))
-		return fmt.Errorf("failed to get weather data: %w", err)
-	}
-
-	defer func() {
-		if err := res.Body.Close(); err != nil {
-			s.Logger.Error("Error closing response body", zap.Error(err))
-		}
-	}()
-
-	if err := json.NewDecoder(res.Body).Decode(respStruct); err != nil {
-		s.Logger.Error("Failed to decode weather data", zap.String("url", weatherURL), zap.Error(err))
-		return fmt.Errorf("failed to decode weather data: %w", err)
-	}
-
-	return nil
-}
-
 // GetCurrentWeatherByCity returns the current weather (temperature and weather speed).
-// It uses the lat/lon of the city entered.
 func (s *Service) GetCurrentWeatherByCity(
 	w http.ResponseWriter,
 	city string,
@@ -374,6 +280,99 @@ func (s *Service) UpdateUserUnits(w http.ResponseWriter, r *http.Request) error 
 	if err := json.NewEncoder(w).Encode(map[string]string{"units": userData.Units}); err != nil {
 		s.Logger.Error("Error encoding response", zap.Error(err))
 		return fmt.Errorf("failed to encode response: %w", err)
+	}
+
+	return nil
+}
+
+// doRequest validates a url, sets up a context, and performs an HTTP request.
+func (s *Service) doRequest(method, rawURL string, body io.Reader) (*http.Response, error) {
+	validatedURL, err := s.validateURL(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate URL: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, method, validatedURL, body)
+	if err != nil {
+		s.Logger.Error("Failed to create HTTP request", zap.String("url", rawURL), zap.Error(err))
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		s.Logger.Error("Failed to perform HTTP request", zap.String("url", validatedURL), zap.Error(err))
+		return nil, fmt.Errorf("failed to perform HTTP request: %w", err)
+	}
+
+	return res, nil
+}
+
+// validateStreamURL will validate a url.
+func (s *Service) validateURL(rawURL string) (string, error) {
+	parsedURL, err := url.Parse(rawURL)
+	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
+		return "", fmt.Errorf("%w: %s", errInvalidURL, rawURL)
+	}
+
+	return parsedURL.String(), nil
+}
+
+// GetGeocode returns the geocode for a city. It's primarily used by open-meteo endpoints which only accept lat/lon.
+func (s *Service) getGeocode(city string) (float64, float64, error) {
+	geoURL := fmt.Sprintf(s.GeocodeAPIURL, url.QueryEscape(city))
+
+	res, err := s.doRequest(http.MethodGet, geoURL, nil)
+	if err != nil {
+		s.Logger.Error("Failed to fetch geocode", zap.String("city", city), zap.Error(err))
+		return 0, 0, fmt.Errorf("failed to get geocode: %w", err)
+	}
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			s.Logger.Error("Error closing response body", zap.Error(err))
+		}
+	}()
+
+	var geoData GeocodeResponse
+	if err := json.NewDecoder(res.Body).Decode(&geoData); err != nil || len(geoData.Results) == 0 {
+		s.Logger.Error("No geocode results", zap.String("city", city), zap.Error(err))
+		return 0, 0, fmt.Errorf("%w: %s", errNoResultsForCity, city)
+	}
+
+	return geoData.Results[0].Latitude, geoData.Results[0].Longitude, nil
+}
+
+// GetWeatherData returns weather data based on the passed in url and struct.
+func (s *Service) getWeatherData(city string, url string, respStruct interface{}) error {
+	if city == "" {
+		return errCityRequired
+	}
+
+	lat, lon, err := s.getGeocode(city)
+	if err != nil {
+		return fmt.Errorf("failed to get geocode: %w", err)
+	}
+
+	weatherURL := fmt.Sprintf(url, lat, lon)
+
+	res, err := s.doRequest(http.MethodGet, weatherURL, nil)
+	if err != nil {
+		s.Logger.Error("Failed to get weather data", zap.String("url", weatherURL), zap.Error(err))
+		return fmt.Errorf("failed to get weather data: %w", err)
+	}
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			s.Logger.Error("Error closing response body", zap.Error(err))
+		}
+	}()
+
+	if err := json.NewDecoder(res.Body).Decode(respStruct); err != nil {
+		s.Logger.Error("Failed to decode weather data", zap.String("url", weatherURL), zap.Error(err))
+		return fmt.Errorf("failed to decode weather data: %w", err)
 	}
 
 	return nil
