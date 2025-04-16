@@ -74,9 +74,6 @@ func main() {
 
 	r := chi.NewRouter()
 
-	// TODO: Fix this mess :D
-	// http.HandleFunc("/user/units", weather.UpdateUserUnits)
-
 	var (
 		storageService storage.ServiceInterface = storage.NewStorageService(
 			config.DatabaseURL,
@@ -122,6 +119,12 @@ func main() {
 		city := chi.URLParam(r, "city")
 		if err := weatherService.DeleteCity(w, city); err != nil {
 			http.Error(w, "Error deleting city from user data", http.StatusInternalServerError)
+		}
+	})
+
+	r.Put("/user/units", func(w http.ResponseWriter, r *http.Request) {
+		if err := weatherService.UpdateUserUnits(w, r); err != nil {
+			http.Error(w, "Error updating units in user data", http.StatusInternalServerError)
 		}
 	})
 

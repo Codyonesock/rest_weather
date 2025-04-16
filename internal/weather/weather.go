@@ -50,6 +50,7 @@ type ServiceInterface interface {
 	GetUserData(w http.ResponseWriter) (*models.UserData, error)
 	AddCity(w http.ResponseWriter, city string) error
 	DeleteCity(w http.ResponseWriter, city string) error
+	UpdateUserUnits(w http.ResponseWriter, r *http.Request) error
 }
 
 // Service handles dependencies and config.
@@ -85,6 +86,7 @@ var (
 	errInvalidURL       = errors.New("invalid URL")
 	errNoResultsForCity = errors.New("no results for city")
 	errCityRequired     = errors.New("city is required")
+	errInvalidUnit      = errors.New("invalid unit type")
 )
 
 // doRequest validates a url, sets up a context, and performs an HTTP request.
@@ -339,39 +341,40 @@ func (s *Service) DeleteCity(w http.ResponseWriter, city string) error {
 	return nil
 }
 
-// // UpdateUserUnits allows you to update the global unit type. The options are metric and imperial.
-// func UpdateUserUnits(w http.ResponseWriter, r *http.Request) {
-// 	if r.Method != http.MethodPut {
-// 		http.Error(w, "please use a put", http.StatusMethodNotAllowed)
-// 		return
-// 	}
+// UpdateUserUnits allows you to update the global unit type. The options are metric and imperial.
+func (s *Service) UpdateUserUnits(w http.ResponseWriter, r *http.Request) error {
+	var reqBody struct {
+		Units string `json:"units"`
+	}
 
-// 	var reqBody struct {
-// 		Units string `json:"units"`
-// 	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		s.Logger.Error("Invalid request body", zap.Error(err))
+		return fmt.Errorf("invalid request body: %w", err)
+	}
 
-// 	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-// 		http.Error(w, "invalid body", http.StatusBadRequest)
-// 		return
-// 	}
+	if reqBody.Units != "metric" && reqBody.Units != "imperial" {
+		s.Logger.Warn("Invalid unit type", zap.String("units", reqBody.Units))
+		return fmt.Errorf("%w: %s", errInvalidUnit, reqBody.Units)
+	}
 
-// 	if reqBody.Units != "metric" && reqBody.Units != "imperial" {
-// 		http.Error(w, "invalid unit, choose metric or imperial", http.StatusBadRequest)
-// 		return
-// 	}
+	userData, err := s.Storage.LoadUserData()
+	if err != nil {
+		s.Logger.Error("Error loading user data", zap.Error(err))
+		return fmt.Errorf("failed to load user data: %w", err)
+	}
 
-// 	UserData, err := storage.LoadUserData()
-// 	if err != nil {
-// 		http.Error(w, "error loading user data", http.StatusInternalServerError)
-// 		return
-// 	}
+	userData.Units = reqBody.Units
+	if err := s.Storage.SaveUserData(userData); err != nil {
+		s.Logger.Error("Error saving user data", zap.Error(err))
+		return fmt.Errorf("failed to save user data: %w", err)
+	}
 
-// 	UserData.Units = reqBody.Units
-// 	if err := storage.SaveUserData(UserData); err != nil {
-// 		http.Error(w, "error saving user data", http.StatusInternalServerError)
-// 		return
-// 	}
+	w.Header().Set("Content-Type", "application/json")
 
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(map[string]string{"units": UserData.Units})
-// }
+	if err := json.NewEncoder(w).Encode(map[string]string{"units": userData.Units}); err != nil {
+		s.Logger.Error("Error encoding response", zap.Error(err))
+		return fmt.Errorf("failed to encode response: %w", err)
+	}
+
+	return nil
+}
