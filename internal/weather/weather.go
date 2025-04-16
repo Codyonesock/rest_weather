@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -47,6 +48,7 @@ type ServiceInterface interface {
 	GetCurrentWeatherByCity(w http.ResponseWriter, city string) (*CurrentWeatherResponse, error)
 	GetForecastByCity(w http.ResponseWriter, city string) (*ForecastResponse, error)
 	GetUserData(w http.ResponseWriter) (*models.UserData, error)
+	AddCity(w http.ResponseWriter, city string) error
 }
 
 // Service handles dependencies and config.
@@ -238,22 +240,83 @@ func (s *Service) GetUserData(w http.ResponseWriter) (*models.UserData, error) {
 	return &userData, nil
 }
 
-// // AddOrDeleteUserCity handles POST and DELETE requests for /user/cities/.
-// func AddOrDeleteUserCity(w http.ResponseWriter, r *http.Request) {
-// 	city := strings.TrimPrefix(r.URL.Path, "/user/cities/")
-// 	if city == "" {
-// 		http.Error(w, "city is required", http.StatusBadRequest)
+// AddCity will add a city to your user data.
+func (s *Service) AddCity(w http.ResponseWriter, city string) error {
+	if city == "" {
+		return fmt.Errorf("%w", errCityRequired)
+	}
+
+	userData, err := s.Storage.LoadUserData()
+	if err != nil {
+		s.Logger.Error("Error loading user data", zap.Error(err))
+		return fmt.Errorf("failed to load user data: %w", err)
+	}
+
+	cities := strings.Split(city, ",")
+	for _, newCity := range cities {
+		newCity = strings.TrimSpace(newCity)
+		if newCity == "" {
+			continue
+		}
+
+		exists := false
+
+		for _, existingCity := range userData.Cities {
+			if strings.EqualFold(existingCity, newCity) {
+				exists = true
+				break
+			}
+		}
+
+		if !exists {
+			userData.Cities = append(userData.Cities, newCity)
+		}
+	}
+
+	if err := s.Storage.SaveUserData(userData); err != nil {
+		s.Logger.Error("Error saving user data", zap.Error(err))
+		return fmt.Errorf("failed to save user data: %w", err)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(userData); err != nil {
+		s.Logger.Error("Error encoding response", zap.Error(err))
+		return fmt.Errorf("failed to encode response: %w", err)
+	}
+
+	return nil
+}
+
+// // DeleteCity works in conjunction with weather/AddOrDeleteUserCity. It removes a city in the tracked list.
+// func DeleteCity(w http.ResponseWriter, city string) {
+// 	userData, err := storage.LoadUserData()
+// 	if err != nil {
+// 		http.Error(w, "error loading user data", http.StatusInternalServerError)
 // 		return
 // 	}
 
-// 	switch r.Method {
-// 	case "POST":
-// 		// util.AddCity(w, city)
-// 	case "DELETE":
-// 		// util.DeleteCity(w, city)
-// 	default:
-// 		http.Error(w, "get or post only", http.StatusMethodNotAllowed)
+// 	var cityFound bool
+// 	for i, existingCity := range userData.Cities {
+// 		if strings.EqualFold(existingCity, city) {
+// 			userData.Cities = append(userData.Cities[:i], userData.Cities[i+1:]...)
+// 			cityFound = true
+// 			break
+// 		}
 // 	}
+
+// 	if !cityFound {
+// 		http.Error(w, "city not found", http.StatusNotFound)
+// 		return
+// 	}
+
+// 	if err := storage.SaveUserData(userData); err != nil {
+// 		http.Error(w, "error saving user data", http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	w.Header().Set("Content-Type", "application/json")
+// 	json.NewEncoder(w).Encode(userData.Cities)
 // }
 
 // // UpdateUserUnits allows you to update the global unit type. The options are metric and imperial.
@@ -291,63 +354,4 @@ func (s *Service) GetUserData(w http.ResponseWriter) (*models.UserData, error) {
 
 // 	w.Header().Set("Content-Type", "application/json")
 // 	json.NewEncoder(w).Encode(map[string]string{"units": UserData.Units})
-// }
-
-// // AddCity works in conjunction with weather/AddOrDeleteUserCity. It adds a city to the tracked list.
-// func AddCity(w http.ResponseWriter, city string) {
-// 	userData, err := storage.LoadUserData()
-// 	if err != nil {
-// 		http.Error(w, "error loading user data", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	for _, existingCity := range userData.Cities {
-// 		if strings.EqualFold(existingCity, city) {
-// 			http.Error(w, "city already tracked", http.StatusBadRequest)
-// 			return
-// 		}
-// 	}
-
-// 	caser := cases.Title(language.BritishEnglish)
-// 	titleCity := caser.String(city)
-// 	userData.Cities = append(userData.Cities, titleCity)
-
-// 	if err := storage.SaveUserData(userData); err != nil {
-// 		http.Error(w, "error saving city", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(userData.Cities)
-// }
-
-// // DeleteCity works in conjunction with weather/AddOrDeleteUserCity. It removes a city in the tracked list.
-// func DeleteCity(w http.ResponseWriter, city string) {
-// 	userData, err := storage.LoadUserData()
-// 	if err != nil {
-// 		http.Error(w, "error loading user data", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	var cityFound bool
-// 	for i, existingCity := range userData.Cities {
-// 		if strings.EqualFold(existingCity, city) {
-// 			userData.Cities = append(userData.Cities[:i], userData.Cities[i+1:]...)
-// 			cityFound = true
-// 			break
-// 		}
-// 	}
-
-// 	if !cityFound {
-// 		http.Error(w, "city not found", http.StatusNotFound)
-// 		return
-// 	}
-
-// 	if err := storage.SaveUserData(userData); err != nil {
-// 		http.Error(w, "error saving user data", http.StatusInternalServerError)
-// 		return
-// 	}
-
-// 	w.Header().Set("Content-Type", "application/json")
-// 	json.NewEncoder(w).Encode(userData.Cities)
 // }

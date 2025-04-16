@@ -112,6 +112,13 @@ func main() {
 		}
 	})
 
+	r.Post("/user/cities/{city}", func(w http.ResponseWriter, r *http.Request) {
+		city := chi.URLParam(r, "city")
+		if err := weatherService.AddCity(w, city); err != nil {
+			http.Error(w, "Error getting adding city to user data", http.StatusInternalServerError)
+		}
+	})
+
 	logger.Info("Server running", zap.String("port", config.Port))
 	server := &http.Server{
 		Addr:         config.Port,
