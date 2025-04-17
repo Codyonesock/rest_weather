@@ -83,10 +83,10 @@ const contextTimeout = 5 * time.Second
 
 // err113 demands no dynamic errors!
 var (
-	errInvalidURL       = errors.New("invalid URL")
-	errNoResultsForCity = errors.New("no results for city")
-	errCityRequired     = errors.New("city is required")
-	errInvalidUnit      = errors.New("invalid unit type")
+	ErrInvalidURL       = errors.New("invalid URL")
+	ErrNoResultsForCity = errors.New("no results for city")
+	ErrCityRequired     = errors.New("city is required")
+	ErrInvalidUnit      = errors.New("invalid unit type")
 )
 
 // GetCurrentWeatherByCity returns the current weather (temperature and weather speed).
@@ -152,7 +152,7 @@ func (s *Service) GetUserData(w http.ResponseWriter) (*models.UserData, error) {
 // AddCity will add the passed in cities to your user data.
 func (s *Service) AddCity(w http.ResponseWriter, city string) error {
 	if city == "" {
-		return fmt.Errorf("%w", errCityRequired)
+		return fmt.Errorf("%w", ErrCityRequired)
 	}
 
 	userData, err := s.Storage.LoadUserData()
@@ -200,7 +200,7 @@ func (s *Service) AddCity(w http.ResponseWriter, city string) error {
 // DeleteCity will remove the passed in cities from your user data.
 func (s *Service) DeleteCity(w http.ResponseWriter, city string) error {
 	if city == "" {
-		return fmt.Errorf("%w", errCityRequired)
+		return fmt.Errorf("%w", ErrCityRequired)
 	}
 
 	userData, err := s.Storage.LoadUserData()
@@ -260,7 +260,7 @@ func (s *Service) UpdateUserUnits(w http.ResponseWriter, r *http.Request) error 
 
 	if reqBody.Units != "metric" && reqBody.Units != "imperial" {
 		s.Logger.Warn("Invalid unit type", zap.String("units", reqBody.Units))
-		return fmt.Errorf("%w: %s", errInvalidUnit, reqBody.Units)
+		return fmt.Errorf("%w: %s", ErrInvalidUnit, reqBody.Units)
 	}
 
 	userData, err := s.Storage.LoadUserData()
@@ -314,7 +314,7 @@ func (s *Service) doRequest(method, rawURL string, body io.Reader) (*http.Respon
 func (s *Service) validateURL(rawURL string) (string, error) {
 	parsedURL, err := url.Parse(rawURL)
 	if err != nil || parsedURL.Scheme != "https" || parsedURL.Host == "" {
-		return "", fmt.Errorf("%w: %s", errInvalidURL, rawURL)
+		return "", fmt.Errorf("%w: %s", ErrInvalidURL, rawURL)
 	}
 
 	return parsedURL.String(), nil
@@ -339,7 +339,7 @@ func (s *Service) getGeocode(city string) (float64, float64, error) {
 	var geoData GeocodeResponse
 	if err := json.NewDecoder(res.Body).Decode(&geoData); err != nil || len(geoData.Results) == 0 {
 		s.Logger.Error("No geocode results", zap.String("city", city), zap.Error(err))
-		return 0, 0, fmt.Errorf("%w: %s", errNoResultsForCity, city)
+		return 0, 0, fmt.Errorf("%w: %s", ErrNoResultsForCity, city)
 	}
 
 	return geoData.Results[0].Latitude, geoData.Results[0].Longitude, nil
@@ -348,7 +348,7 @@ func (s *Service) getGeocode(city string) (float64, float64, error) {
 // GetWeatherData returns weather data based on the passed in url and struct.
 func (s *Service) getWeatherData(city string, url string, respStruct interface{}) error {
 	if city == "" {
-		return errCityRequired
+		return ErrCityRequired
 	}
 
 	lat, lon, err := s.getGeocode(city)

@@ -9,11 +9,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-chi/chi"
 	"go.uber.org/zap"
 
 	"github.com/codyonesock/rest_weather/internal/storage"
 	"github.com/codyonesock/rest_weather/internal/weather"
-	"github.com/go-chi/chi"
 )
 
 const (

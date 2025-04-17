@@ -1,118 +1,220 @@
 package weather_test
 
-// import (
-// 	"bytes"
-// 	"net/http"
-// 	"net/http/httptest"
-// 	"os"
-// 	"testing"
-// )
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
 
-// func TestGetCurrentWeatherByCity(t *testing.T) {
-// 	req, err := http.NewRequest("GET", "/weather?city=Halifax", nil)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/weather"
+	"go.uber.org/zap"
+)
 
-// 	recorder := httptest.NewRecorder()
-// 	handler := http.HandlerFunc(GetCurrentWeatherByCity)
-// 	handler.ServeHTTP(recorder, req)
+type MockStorage struct {
+	LoadUserDataFunc func() (models.UserData, error)
+	SaveUserDataFunc func(models.UserData) error
+}
 
-// 	if status := recorder.Code; status != http.StatusOK {
-// 		t.Errorf("HandleFunc returned wrong status code: got %v want %v", status, http.StatusOK)
-// 	}
-// }
+func (m *MockStorage) LoadUserData() (models.UserData, error) {
+	return m.LoadUserDataFunc()
+}
 
-// func TestGetForecastByCity(t *testing.T) {
-// 	req, err := http.NewRequest("GET", "/forecast?city=Halifax", nil)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+func (m *MockStorage) SaveUserData(data models.UserData) error {
+	return m.SaveUserDataFunc(data)
+}
 
-// 	recorder := httptest.NewRecorder()
-// 	handler := http.HandlerFunc(GetForecastByCity)
-// 	handler.ServeHTTP(recorder, req)
+func setupMockWeatherService() (*weather.Service, *MockStorage) {
+	mockStorage := &MockStorage{
+		LoadUserDataFunc: nil,
+		SaveUserDataFunc: nil,
+	}
+	logger, _ := zap.NewDevelopment()
 
-// 	if status := recorder.Code; status != http.StatusOK {
-// 		t.Errorf("HandleFunc returned wrong status code: got %v want %v", status, http.StatusOK)
-// 	}
-// }
+	weatherService := weather.NewWeatherService(
+		logger,
+		mockStorage,
+		"https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true",
+		"https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&daily=temperature_2m_max,temperature_2m_min",
+		"https://geocoding-api.open-meteo.com/v1/search?name=%s&count=1&language=en&format=json",
+	)
 
-// func TestGetUserData(t *testing.T) {
-// 	req, err := http.NewRequest("GET", "/user/data", nil)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	return weatherService, mockStorage
+}
 
-// 	recorder := httptest.NewRecorder()
-// 	handler := http.HandlerFunc(GetUserData)
-// 	handler.ServeHTTP(recorder, req)
+func TestGetCurrentWeatherByCity(t *testing.T) {
+	t.Parallel()
 
-// 	if status := recorder.Code; status != http.StatusOK {
-// 		t.Errorf("HandleFunc returned wrong status code: got %v want %v", status, http.StatusOK)
-// 	}
+	weatherService, _ := setupMockWeatherService()
 
-// 	os.Remove("userdata.json")
-// }
+	rec := httptest.NewRecorder()
 
-// func TestAddOrDeleteUserCity_Add(t *testing.T) {
-// 	req, err := http.NewRequest("POST", "/user/cities/Halifax", nil)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	_, err := weatherService.GetCurrentWeatherByCity(rec, "halifax")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
-// 	recorder := httptest.NewRecorder()
-// 	handler := http.HandlerFunc(AddOrDeleteUserCity)
-// 	handler.ServeHTTP(recorder, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, rec.Code)
+	}
+}
 
-// 	if status := recorder.Code; status != http.StatusOK {
-// 		t.Errorf("HandleFunc returned wrong status code: got %v want %v", status, http.StatusOK)
-// 	}
+func TestGetForecastByCity(t *testing.T) {
+	t.Parallel()
 
-// 	os.Remove("userdata.json")
-// }
+	weatherService, _ := setupMockWeatherService()
 
-// func TestAddOrDeleteUserCity_Delete(t *testing.T) {
-// 	// Add a city to delete later
-// 	addReq, err := http.NewRequest("POST", "/user/cities/Halifax", nil)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	addRecorder := httptest.NewRecorder()
-// 	addHandler := http.HandlerFunc(AddOrDeleteUserCity)
-// 	addHandler.ServeHTTP(addRecorder, addReq)
+	rec := httptest.NewRecorder()
 
-// 	req, err := http.NewRequest("DELETE", "/user/cities/Halifax", nil)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
+	_, err := weatherService.GetForecastByCity(rec, "halifax")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
 
-// 	recorder := httptest.NewRecorder()
-// 	handler := http.HandlerFunc(AddOrDeleteUserCity)
-// 	handler.ServeHTTP(recorder, req)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, rec.Code)
+	}
 
-// 	if status := recorder.Code; status != http.StatusOK {
-// 		t.Errorf("HandleFunc returned wrong status code: got %v want %v", status, http.StatusOK)
-// 	}
+	var response map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 
-// 	os.Remove("userdata.json")
-// }
+	if _, ok := response["daily"]; !ok {
+		t.Errorf("expected 'daily' in response, got %v", response)
+	}
+}
 
-// func TestUpdateUserUnits(t *testing.T) {
-// 	var jsonStr = []byte(`{"units": "metric"}`)
-// 	req, err := http.NewRequest("PUT", "/user/units", bytes.NewBuffer(jsonStr))
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	req.Header.Set("Content-Type", "application/json")
+func TestGetUserData(t *testing.T) {
+	t.Parallel()
 
-// 	recorder := httptest.NewRecorder()
-// 	handler := http.HandlerFunc(UpdateUserUnits)
-// 	handler.ServeHTTP(recorder, req)
+	weatherService, mockStorage := setupMockWeatherService()
 
-// 	if status := recorder.Code; status != http.StatusOK {
-// 		t.Errorf("HandleFunc returned wrong status code: got %v want %v", status, http.StatusOK)
-// 	}
+	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
+		return models.UserData{
+			Cities: []string{"Halifax", "Berlin"},
+			Units:  "metric",
+		}, nil
+	}
 
-// 	os.Remove("userdata.json")
-// }
+	rec := httptest.NewRecorder()
+
+	_, err := weatherService.GetUserData(rec)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	var response models.UserData
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(response.Cities) != 2 || response.Cities[0] != "Halifax" || response.Cities[1] != "Berlin" {
+		t.Errorf("expected cities to be ['Halifax', 'Berlin'], got %v", response.Cities)
+	}
+
+	if response.Units != "metric" {
+		t.Errorf("expected units to be 'metric', got %v", response.Units)
+	}
+}
+
+func TestAddCity(t *testing.T) {
+	t.Parallel()
+
+	weatherService, mockStorage := setupMockWeatherService()
+
+	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
+		return models.UserData{
+			Cities: []string{"Halifax"},
+			Units:  "metric",
+		}, nil
+	}
+	mockStorage.SaveUserDataFunc = func(data models.UserData) error {
+		if len(data.Cities) != 2 || !strings.Contains(strings.Join(data.Cities, ","), "Berlin") {
+			t.Errorf("expected cities to include 'Berlin', got %v", data.Cities)
+		}
+
+		return nil
+	}
+
+	rec := httptest.NewRecorder()
+
+	err := weatherService.AddCity(rec, "Berlin")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestDeleteCity(t *testing.T) {
+	t.Parallel()
+
+	weatherService, mockStorage := setupMockWeatherService()
+
+	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
+		return models.UserData{
+			Cities: []string{"Halifax", "Berlin"},
+			Units:  "metric",
+		}, nil
+	}
+	mockStorage.SaveUserDataFunc = func(data models.UserData) error {
+		if len(data.Cities) != 1 || data.Cities[0] != "Halifax" {
+			t.Errorf("expected cities to only include 'Halifax', got %v", data.Cities)
+		}
+
+		return nil
+	}
+
+	rec := httptest.NewRecorder()
+
+	err := weatherService.DeleteCity(rec, "Berlin")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, rec.Code)
+	}
+}
+
+func TestUpdateUserUnits(t *testing.T) {
+	t.Parallel()
+
+	weatherService, mockStorage := setupMockWeatherService()
+
+	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
+		return models.UserData{
+			Cities: []string{},
+			Units:  "metric",
+		}, nil
+	}
+	mockStorage.SaveUserDataFunc = func(data models.UserData) error {
+		if data.Units != "imperial" {
+			t.Errorf("expected units to be 'imperial', got %v", data.Units)
+		}
+
+		return nil
+	}
+
+	body := bytes.NewBufferString(`{"units": "imperial"}`)
+	req := httptest.NewRequest(http.MethodPut, "/user/units", body)
+	rec := httptest.NewRecorder()
+
+	err := weatherService.UpdateUserUnits(rec, req)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, rec.Code)
+	}
+}
