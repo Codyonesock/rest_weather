@@ -14,6 +14,7 @@ type Config struct {
 	ForecastWeatherAPIURL string `envconfig:"FORECAST_WEATHER_API_URL"`
 	GeocodeAPIURL         string `envconfig:"GEOCODE_API_URL"`
 	DatabaseURL           string `envconfig:"DATABASE_URL" default:"userdata.json"`
+	LogLevel              string `envconfig:"LOG_LEVEL" default:"INFO" `
 }
 
 // LoadConfig loads the application config.

@@ -35,6 +35,7 @@ CURRENT_WEATHER_API_URL=https://api.open-meteo.com/v1/forecast?latitude=%f&longi
 FORECAST_WEATHER_API_URL=https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&daily=temperature_2m_max,temperature_2m_min
 GEOCODE_API_URL=https://geocoding-api.open-meteo.com/v1/search?name=%s&count=1&language=en&format=json
 DATABASE_URL=userdata.json
+LOG_LEVEL=DEBUG
 ```
 
 ## Testing

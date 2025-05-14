@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/codyonesock/rest_weather/internal/config"
+	"github.com/codyonesock/rest_weather/internal/logger"
 	"github.com/codyonesock/rest_weather/internal/storage"
 	"github.com/codyonesock/rest_weather/internal/weather"
 )
@@ -23,22 +24,14 @@ const (
 )
 
 func main() {
-	logger, err := zap.NewProduction()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
-	}
+	cfg := loadConfig()
+	logger := initializeLogger(cfg)
 
 	defer func() {
 		if err := logger.Sync(); err != nil {
-			logger.Fatal("Error syncing logger", zap.Error(err))
+			fmt.Fprintf(os.Stderr, "Failed to flush logger: %v\n", err)
 		}
 	}()
-
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		logger.Fatal("Error loading config", zap.Error(err))
-		return
-	}
 
 	weatherService := initializeServices(cfg, logger)
 	r := setupRouter(weatherService, logger)
@@ -56,6 +49,29 @@ func main() {
 		logger.Fatal("Error starting server", zap.Error(err))
 	}
 }
+
+// loadConfig loads the config.
+func loadConfig() *config.Config {
+	config, err := config.LoadConfig()
+	if err != nil {
+		zap.L().Fatal("Error loading config", zap.Error(err))
+		os.Exit(1)
+	}
+
+	return config
+}
+
+// initializeLogger sets up the zap logger.
+func initializeLogger(config *config.Config) *zap.Logger {
+	logger, err := logger.CreateLogger(config.LogLevel)
+	if err != nil {
+		zap.L().Fatal("Failed to initialize logger", zap.Error(err))
+		os.Exit(1)
+	}
+
+	return logger
+}
+
 func initializeServices(cfg *config.Config, logger *zap.Logger) *weather.Service {
 	storageService := storage.NewStorageService(cfg.DatabaseURL, logger)
 	weatherService := weather.NewWeatherService(
