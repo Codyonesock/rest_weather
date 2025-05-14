@@ -43,3 +43,8 @@ LOG_LEVEL=DEBUG
 ```sh
 go test ./internal/... -race
 ```
+
+## Linting
+```sh
+golangci-lint run ./...
+```
