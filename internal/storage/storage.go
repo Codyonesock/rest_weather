@@ -8,13 +8,13 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/shared"
 )
 
 // ServiceInterface depicts the interface for the storage package.
 type ServiceInterface interface {
-	LoadUserData() (models.UserData, error)
-	SaveUserData(userData models.UserData) error
+	LoadUserData() (shared.UserData, error)
+	SaveUserData(userData shared.UserData) error
 }
 
 // Service for dependencies and config.
@@ -32,7 +32,7 @@ func NewStorageService(filePath string, l *zap.Logger) *Service {
 }
 
 // LoadUserData loads the data from a local file. If it doesn't exist, it creates a default one.
-func (s *Service) LoadUserData() (models.UserData, error) {
+func (s *Service) LoadUserData() (shared.UserData, error) {
 	file, err := os.Open(s.FilePath)
 
 	if err != nil {
@@ -43,7 +43,7 @@ func (s *Service) LoadUserData() (models.UserData, error) {
 
 		s.Logger.Error("Failed to open file", zap.Error(err))
 
-		return models.UserData{}, fmt.Errorf("failed to open file: %w", err)
+		return shared.UserData{}, fmt.Errorf("failed to open file: %w", err)
 	}
 
 	defer func() {
@@ -52,17 +52,17 @@ func (s *Service) LoadUserData() (models.UserData, error) {
 		}
 	}()
 
-	var userData models.UserData
+	var userData shared.UserData
 	if err := json.NewDecoder(file).Decode(&userData); err != nil {
 		s.Logger.Error("Failed to decode file", zap.Error(err))
-		return models.UserData{}, fmt.Errorf("failed to decode file: %w", err)
+		return shared.UserData{}, fmt.Errorf("failed to decode file: %w", err)
 	}
 
 	return userData, nil
 }
 
 // SaveUserData saves user data to the local file.
-func (s *Service) SaveUserData(userData models.UserData) error {
+func (s *Service) SaveUserData(userData shared.UserData) error {
 	file, err := os.Create(s.FilePath)
 	if err != nil {
 		s.Logger.Error("Failed to create file", zap.Error(err))
@@ -84,8 +84,8 @@ func (s *Service) SaveUserData(userData models.UserData) error {
 }
 
 // createDefaultUserData creates a default user data file and returns the default data.
-func (s *Service) createDefaultUserData() (models.UserData, error) {
-	defaultData := models.UserData{
+func (s *Service) createDefaultUserData() (shared.UserData, error) {
+	defaultData := shared.UserData{
 		Cities: []string{},
 		Units:  "metric",
 	}
@@ -93,7 +93,7 @@ func (s *Service) createDefaultUserData() (models.UserData, error) {
 	file, err := os.Create(s.FilePath)
 	if err != nil {
 		s.Logger.Error("Failed to create file", zap.Error(err))
-		return models.UserData{}, fmt.Errorf("failed to create file: %w", err)
+		return shared.UserData{}, fmt.Errorf("failed to create file: %w", err)
 	}
 
 	defer func() {
@@ -104,7 +104,7 @@ func (s *Service) createDefaultUserData() (models.UserData, error) {
 
 	if err := json.NewEncoder(file).Encode(defaultData); err != nil {
 		s.Logger.Error("Failed to write default data", zap.Error(err))
-		return models.UserData{}, fmt.Errorf("failed to write default data: %w", err)
+		return shared.UserData{}, fmt.Errorf("failed to write default data: %w", err)
 	}
 
 	return defaultData, nil

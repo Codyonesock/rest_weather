@@ -1,5 +1,5 @@
-// Package models is for shared models.
-package models
+// Package shared is for shared stuff.
+package shared
 
 // UserData is a struct that represents the local userdata.json file used to track preferences.
 type UserData struct {

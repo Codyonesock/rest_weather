@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/shared"
 	"github.com/codyonesock/rest_weather/internal/storage"
 )
 
@@ -57,7 +57,7 @@ func TestSaveUserData(t *testing.T) {
 	storageService, cleanup := setupTestStorage(t)
 	defer cleanup()
 
-	userData := models.UserData{
+	userData := shared.UserData{
 		Cities: []string{"Halifax"},
 		Units:  "metric",
 	}

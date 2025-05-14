@@ -8,21 +8,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/shared"
 	"github.com/codyonesock/rest_weather/internal/weather"
 	"go.uber.org/zap"
 )
 
 type MockStorage struct {
-	LoadUserDataFunc func() (models.UserData, error)
-	SaveUserDataFunc func(models.UserData) error
+	LoadUserDataFunc func() (shared.UserData, error)
+	SaveUserDataFunc func(shared.UserData) error
 }
 
-func (m *MockStorage) LoadUserData() (models.UserData, error) {
+func (m *MockStorage) LoadUserData() (shared.UserData, error) {
 	return m.LoadUserDataFunc()
 }
 
-func (m *MockStorage) SaveUserData(data models.UserData) error {
+func (m *MockStorage) SaveUserData(data shared.UserData) error {
 	return m.SaveUserDataFunc(data)
 }
 
@@ -92,8 +92,8 @@ func TestGetUserData(t *testing.T) {
 
 	weatherService, mockStorage := setupMockWeatherService()
 
-	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
-		return models.UserData{
+	mockStorage.LoadUserDataFunc = func() (shared.UserData, error) {
+		return shared.UserData{
 			Cities: []string{"Halifax", "Berlin"},
 			Units:  "metric",
 		}, nil
@@ -110,7 +110,7 @@ func TestGetUserData(t *testing.T) {
 		t.Errorf("expected status code %d, got %d", http.StatusOK, rec.Code)
 	}
 
-	var response models.UserData
+	var response shared.UserData
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 		t.Fatalf("failed to decode response: %v", err)
 	}
@@ -129,13 +129,13 @@ func TestAddCity(t *testing.T) {
 
 	weatherService, mockStorage := setupMockWeatherService()
 
-	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
-		return models.UserData{
+	mockStorage.LoadUserDataFunc = func() (shared.UserData, error) {
+		return shared.UserData{
 			Cities: []string{"Halifax"},
 			Units:  "metric",
 		}, nil
 	}
-	mockStorage.SaveUserDataFunc = func(data models.UserData) error {
+	mockStorage.SaveUserDataFunc = func(data shared.UserData) error {
 		if len(data.Cities) != 2 || !strings.Contains(strings.Join(data.Cities, ","), "Berlin") {
 			t.Errorf("expected cities to include 'Berlin', got %v", data.Cities)
 		}
@@ -160,13 +160,13 @@ func TestDeleteCity(t *testing.T) {
 
 	weatherService, mockStorage := setupMockWeatherService()
 
-	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
-		return models.UserData{
+	mockStorage.LoadUserDataFunc = func() (shared.UserData, error) {
+		return shared.UserData{
 			Cities: []string{"Halifax", "Berlin"},
 			Units:  "metric",
 		}, nil
 	}
-	mockStorage.SaveUserDataFunc = func(data models.UserData) error {
+	mockStorage.SaveUserDataFunc = func(data shared.UserData) error {
 		if len(data.Cities) != 1 || data.Cities[0] != "Halifax" {
 			t.Errorf("expected cities to only include 'Halifax', got %v", data.Cities)
 		}
@@ -191,13 +191,13 @@ func TestUpdateUserUnits(t *testing.T) {
 
 	weatherService, mockStorage := setupMockWeatherService()
 
-	mockStorage.LoadUserDataFunc = func() (models.UserData, error) {
-		return models.UserData{
+	mockStorage.LoadUserDataFunc = func() (shared.UserData, error) {
+		return shared.UserData{
 			Cities: []string{},
 			Units:  "metric",
 		}, nil
 	}
-	mockStorage.SaveUserDataFunc = func(data models.UserData) error {
+	mockStorage.SaveUserDataFunc = func(data shared.UserData) error {
 		if data.Units != "imperial" {
 			t.Errorf("expected units to be 'imperial', got %v", data.Units)
 		}

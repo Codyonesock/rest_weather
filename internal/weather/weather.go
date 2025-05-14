@@ -14,7 +14,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/codyonesock/rest_weather/internal/models"
+	"github.com/codyonesock/rest_weather/internal/shared"
 	"github.com/codyonesock/rest_weather/internal/storage"
 )
 
@@ -47,7 +47,7 @@ type ForecastResponse struct {
 type ServiceInterface interface {
 	GetCurrentWeatherByCity(w http.ResponseWriter, city string) (*CurrentWeatherResponse, error)
 	GetForecastByCity(w http.ResponseWriter, city string) (*ForecastResponse, error)
-	GetUserData(w http.ResponseWriter) (*models.UserData, error)
+	GetUserData(w http.ResponseWriter) (*shared.UserData, error)
 	AddCity(w http.ResponseWriter, city string) error
 	DeleteCity(w http.ResponseWriter, city string) error
 	UpdateUserUnits(w http.ResponseWriter, r *http.Request) error
@@ -132,7 +132,7 @@ func (s *Service) GetForecastByCity(
 }
 
 // GetUserData returns user data that's read from a local json file.
-func (s *Service) GetUserData(w http.ResponseWriter) (*models.UserData, error) {
+func (s *Service) GetUserData(w http.ResponseWriter) (*shared.UserData, error) {
 	userData, err := s.Storage.LoadUserData()
 	if err != nil {
 		s.Logger.Error("Error loading user data", zap.Error(err))
