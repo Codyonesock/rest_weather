@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
 
+	"github.com/codyonesock/rest_weather/internal/config"
 	"github.com/codyonesock/rest_weather/internal/storage"
 	"github.com/codyonesock/rest_weather/internal/weather"
 )
@@ -21,14 +21,6 @@ const (
 	writeTimeout = 10 * time.Second
 	idleTimeout  = 10 * time.Second
 )
-
-type config struct {
-	Port                  string `json:"port"`
-	CurrentWeatherAPIURL  string `json:"current_weather_api_url"`
-	ForecastWeatherAPIURL string `json:"forecast_weather_api_url"`
-	GeocodeAPIURL         string `json:"geocode_api_url"`
-	DatabaseURL           string `json:"database_url"`
-}
 
 func main() {
 	logger, err := zap.NewProduction()
@@ -42,19 +34,18 @@ func main() {
 		}
 	}()
 
-	config, err := loadConfig("config.json", logger)
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		logger.Fatal("Error loading config", zap.Error(err))
 		return
 	}
 
-	weatherService := initializeServices(config, logger)
-
+	weatherService := initializeServices(cfg, logger)
 	r := setupRouter(weatherService, logger)
 
-	logger.Info("Server running", zap.String("port", config.Port))
+	logger.Info("Server running", zap.String("port", cfg.Port))
 	server := &http.Server{
-		Addr:         config.Port,
+		Addr:         cfg.Port,
 		Handler:      r,
 		ReadTimeout:  readTimeout,
 		WriteTimeout: writeTimeout,
@@ -65,39 +56,14 @@ func main() {
 		logger.Fatal("Error starting server", zap.Error(err))
 	}
 }
-
-func loadConfig(filename string, l *zap.Logger) (*config, error) {
-	data, err := os.ReadFile("config.json")
-	if err != nil {
-		l.Error("Error reading config file", zap.String("filename", filename), zap.Error(err))
-		return nil, fmt.Errorf("error reading config file: %w", err)
-	}
-
-	var cfg config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		l.Error("Error unmarshalling JSON", zap.Error(err))
-		return nil, fmt.Errorf("error unmarshalling JSON: %w", err)
-	}
-
-	l.Info("Config loaded",
-		zap.String("port", cfg.Port),
-		zap.String("current_weather_api_url", cfg.CurrentWeatherAPIURL),
-		zap.String("forecast_weather_api_url", cfg.ForecastWeatherAPIURL),
-		zap.String("geocode_api_url", cfg.GeocodeAPIURL),
-		zap.String("database_url", cfg.DatabaseURL),
-	)
-
-	return &cfg, nil
-}
-
-func initializeServices(config *config, logger *zap.Logger) *weather.Service {
-	storageService := storage.NewStorageService(config.DatabaseURL, logger)
+func initializeServices(cfg *config.Config, logger *zap.Logger) *weather.Service {
+	storageService := storage.NewStorageService(cfg.DatabaseURL, logger)
 	weatherService := weather.NewWeatherService(
 		logger,
 		storageService,
-		config.CurrentWeatherAPIURL,
-		config.ForecastWeatherAPIURL,
-		config.GeocodeAPIURL,
+		cfg.CurrentWeatherAPIURL,
+		cfg.ForecastWeatherAPIURL,
+		cfg.GeocodeAPIURL,
 	)
 
 	return weatherService

@@ -10,6 +10,7 @@ linters:
             - github.com/codyonesock
             - github.com/go-chi
             - go.uber.org/zap
+            - github.com/kelseyhightower/envconfig
     exhaustruct:
       exclude:
         - '^net/http\.Server$'
@@ -21,3 +22,4 @@ linters:
       min-name-length: 1
   disable:
     - nlreturn
+    - tagalign

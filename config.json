@@ -1,7 +1,0 @@
-{
-  "port": ":8080",
-  "current_weather_api_url": "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true",
-  "forecast_weather_api_url": "https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&daily=temperature_2m_max,temperature_2m_min",
-  "geocode_api_url": "https://geocoding-api.open-meteo.com/v1/search?name=%s&count=1&language=en&format=json",
-  "database_url": "userdata.json"
-}
