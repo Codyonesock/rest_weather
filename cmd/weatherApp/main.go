@@ -34,20 +34,7 @@ func main() {
 	}()
 
 	weatherService := initializeServices(cfg, logger)
-	r := setupRouter(weatherService, logger)
-
-	logger.Info("Server running", zap.String("port", cfg.Port))
-	server := &http.Server{
-		Addr:         cfg.Port,
-		Handler:      r,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
-		IdleTimeout:  idleTimeout,
-	}
-
-	if err := server.ListenAndServe(); err != nil {
-		logger.Fatal("Error starting server", zap.Error(err))
-	}
+	startServer(cfg, logger, weatherService)
 }
 
 // loadConfig loads the config.
@@ -85,7 +72,24 @@ func initializeServices(cfg *config.Config, logger *zap.Logger) *weather.Service
 	return weatherService
 }
 
-func setupRouter(weatherService weather.ServiceInterface, logger *zap.Logger) *chi.Mux {
+func startServer(cfg *config.Config, logger *zap.Logger, weatherService *weather.Service) {
+	r := setupRouter(weatherService, logger)
+
+	logger.Info("Server running", zap.String("port", cfg.Port))
+	server := &http.Server{
+		Addr:         cfg.Port,
+		Handler:      r,
+		ReadTimeout:  readTimeout,
+		WriteTimeout: writeTimeout,
+		IdleTimeout:  idleTimeout,
+	}
+
+	if err := server.ListenAndServe(); err != nil {
+		logger.Fatal("Error starting server", zap.Error(err))
+	}
+}
+
+func setupRouter(weatherService *weather.Service, logger *zap.Logger) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Get("/weather/{city}", func(w http.ResponseWriter, r *http.Request) {

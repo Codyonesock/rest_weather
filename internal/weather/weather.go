@@ -43,16 +43,6 @@ type ForecastResponse struct {
 	} `json:"daily"`
 }
 
-// ServiceInterface depicts the interface for the weather package.
-type ServiceInterface interface {
-	GetCurrentWeatherByCity(w http.ResponseWriter, city string) (*CurrentWeatherResponse, error)
-	GetForecastByCity(w http.ResponseWriter, city string) (*ForecastResponse, error)
-	GetUserData(w http.ResponseWriter) (*shared.UserData, error)
-	AddCity(w http.ResponseWriter, city string) error
-	DeleteCity(w http.ResponseWriter, city string) error
-	UpdateUserUnits(w http.ResponseWriter, r *http.Request) error
-}
-
 // Service handles dependencies and config.
 type Service struct {
 	Logger                *zap.Logger
